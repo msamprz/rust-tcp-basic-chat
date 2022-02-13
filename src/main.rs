@@ -46,8 +46,8 @@ fn main() {
         }
 
         if let Ok((msg, msg_peer_addr)) = rx.try_recv() {
-            clients = clients.into_iter().filter_map(|mut client| match client.peer_addr().unwrap() {
-                client_addr if client_addr == msg_peer_addr => Some(client),
+            clients = clients.into_iter().filter_map(|mut client| match client.peer_addr() {
+                Ok(client_addr) if client_addr == msg_peer_addr => Some(client),
                 _ => {
                     let mut buff = msg.clone().into_bytes();
                     buff.resize(MSG_SIZE, 0);
