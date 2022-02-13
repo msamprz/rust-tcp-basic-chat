@@ -15,7 +15,7 @@ fn main() {
     server.set_nonblocking(true).expect("Failed to initialize non-blocking");
 
     let mut clients = vec![];
-    let (tx, rx) = mpsc::channel::<String>();
+    let (tx, rx) = mpsc::channel::<(String, std::net::SocketAddr)>();
 
     loop {
         if let Ok((mut socket, addr)) = server.accept() {
@@ -32,7 +32,7 @@ fn main() {
                         let msg = String::from_utf8(msg).expect("Invalid utf8 message");
 
                         println!("{}: {:?}", addr, msg);
-                        tx.send(msg).expect("Failed to send msg to rx");
+                        tx.send((msg, addr)).expect("Failed to send msg to rx");
                     },
                     Err(ref err) if err.kind() == ErrorKind::WouldBlock => (),
                     Err(_) => {
@@ -45,12 +45,15 @@ fn main() {
             });
         }
 
-        if let Ok(msg) = rx.try_recv() {
-            clients = clients.into_iter().filter_map(|mut client| {
-                let mut buff = msg.clone().into_bytes();
-                buff.resize(MSG_SIZE, 0);
+        if let Ok((msg, msg_peer_addr)) = rx.try_recv() {
+            clients = clients.into_iter().filter_map(|mut client| match client.peer_addr().unwrap() {
+                client_addr if client_addr == msg_peer_addr => Some(client),
+                _ => {
+                    let mut buff = msg.clone().into_bytes();
+                    buff.resize(MSG_SIZE, 0);
 
-                client.write_all(&buff).map(|_| client).ok()
+                    client.write_all(&buff).map(|_| client).ok()
+                }
             }).collect::<Vec<_>>();
         }
 
